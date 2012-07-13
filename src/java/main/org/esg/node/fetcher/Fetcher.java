@@ -80,7 +80,7 @@ public static class Fetcher {
 	retry = retries;
 	HttpMethod getHttp = new GetMethod(url);
 	getHttp.setFollowRedirects(true);
-	HttpMethodRetryHandler retryHandler = new HttpMethodRetryHandler() { retryMethod };
+	HttpMethodRetryHandler retryHandler = new HttpMethodRetryHandler() { retryMethod(); }
         getHttp.getParams().setParameter(HttpMethodParams.RETRY_HANDLER, retryHandler);
 	
 	try{
@@ -173,8 +173,9 @@ public static class Fetcher {
 	}
 	
 	String address = args[0];
-        try{int numRetries = Integer.parseInt(args[1]);}
-	catch (NumberFormatException e) {
+        try{ 
+	    int numRetries = Integer.parseInt(args[1]);
+	}catch (NumberFormatException e) {
 	    System.err.println("The third argument" + " must be an integer");
 	    System.exit(1);
 	}
