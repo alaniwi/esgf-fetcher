@@ -60,7 +60,6 @@ import java.io.*; //FileInput(Output)Stream, InputStream,
 import java.nio.*;
 import java.nio.channels.spi;
 
-
 /**
    Description:
    This class pulls files from desginated targets to local host
@@ -75,16 +74,15 @@ public static class Fetcher {
     String fileName;
 
     public void fetchURLContent(String address, int retries) {
-	
 	url = new URL(address);
         isValid(); //check this method. it might be unecessary! 
-
+	
 	retry = retries;
 	HttpMethod getHttp = new GetMethod(url);
 	getHttp.setFollowRedirects(true);
 	HttpMethodRetryHandler retryHandler = new HttpMethodRetryHandler() { retryMethod };
         getHttp.getParams().setParameter(HttpMethodParams.RETRY_HANDLER, retryHandler);
-
+	
 	try{
 	    int codeStatus =  client.executeMethod(getHttp);
 	    if(statusCode != HttpStatus.SC_OK){ System.err.println("Method failed: " + getHttp.getStatusLine().toString()); }
@@ -97,9 +95,7 @@ public static class Fetcher {
 	      }
 	      out.flush();
 	      out.close(); */
-	}	
-
-	catch(HttpException e){
+	}catch(HttpException e){
 	    System.err.println(e.getMessage);
 	    e.printStackTrace();
 	}
@@ -108,50 +104,39 @@ public static class Fetcher {
 	//Buffer here!
 	byte[] responseBody = getUrl.getResponseBodyAsStream();
 	
-	try(SeekByteChannel sbc = Files.newByteChannel(responseBody)){
-		ByteByffer buffer = ByteBuffer.allocate(1024);	
-		String encoding = System.getProperty("file.ecoding");
-	   
-		while(sbc.read(buffer)){
-		    buffer.rewind();
-		    System.out.print(Charset.forName(encoding).decode(buffer)); //gets name of the charset,Changes to Unicorde
-		    buffer.flip();
-		}
+	try {
+	    SeekByteChannel sbc = Files.newByteChannel(responseBody);
+	    ByteByffer buffer = ByteBuffer.allocate(1024);	
+	    String encoding = System.getProperty("file.ecoding");
+	    
+	    while(sbc.read(buffer)) {
+		buffer.rewind();
+		System.out.print(Charset.forName(encoding).decode(buffer)); //gets name of the charset,Changes to Unicode
+		buffer.flip();
 	    }
-
-	catch(ClosedChannelException e){
+	}catch(ClosedChannelException e) {
 	    System.err.println(e.getMessage);
 	    e.printStackTrace();
-	}
-	catch(AsynchronousCloseException e){
+	}catch(AsynchronousCloseException e) {
 	    System.err.println(e.getMessage);
 	    e.printStackTrace();
-	}
-	catch(ClosedByInterruptException e){
+	}catch(ClosedByInterruptException e) {
 	    System.err.println(e.getMessage);
 	    e.printStackTrace();  
-	}
-	catch(IOException io){
+	}catch(IOException io) {
 	    System.err.println(e.getMessage);
 	    e.printStackTrace();
-	}
-	
-	finally{ getHttp.releaseConnection();}
-
+	}finally { getHttp.releaseConnection(); }
     }
 
-
     public boolean retryMethod(final HttpMethod method, final IOException, int retryCount) {
-
 	if(retryCount >= retry){ return false; }
 	if(exception instanceof NoHttpResponseException){ return true; }
 	if(!method.isRequestSent()){ return true;}
 	
 	return false;
-
     }
 
-    
     public boolean setDirectory(String dir) {
 	filename = url.getFile();   
 	return file(url, new File(filename));
@@ -165,7 +150,6 @@ public static class Fetcher {
 	Path path = url.getPath;
 	String fileN = url.getFile();
 	return System.out.println("FileName: " + fileN + "Path: " + path);
-	
     }
 
     public boolean validateUrl() {
@@ -176,13 +160,10 @@ public static class Fetcher {
 	if(!UrlValidator.isValid(url)) {
 	    System.out.print("Url was invalid. Please try again");
             isValid = false;
-	}
-
-	else 
+	}else{
 	    isValid = true;
-
+	}
 	return isValid;
-
     }
 
     public static void main(String [ ] args) {
@@ -190,19 +171,17 @@ public static class Fetcher {
 	    System.err.println("Please enter 3 arguments: url,retry number, and the directory to save");
 	    System.exit(1);
 	}
-		
+	
 	String address = args[0];
         try{int numRetries = Integer.parseInt(args[1]);}
 	catch (NumberFormatException e) {
 	    System.err.println("The third argument" + " must be an integer");
 	    System.exit(1);
 	}
-	
+
 	directory = args[2];
 	client = new HttpClient();
 	fetchURLContent(address, numRetries);
 	setDirectory(args[2]);
-
     }
-
 }
