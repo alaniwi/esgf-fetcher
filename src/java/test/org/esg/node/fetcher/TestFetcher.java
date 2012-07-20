@@ -50,7 +50,43 @@
 package org.esg.node.fetcher;
 
 import org.junit.Test;
+import junit.framework.TestCase;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
+import org.apache.commons.httpclient.URI;
+import org.apache.commons.httpclient.*;
+import org.apache.commons.httpclient.methods.*;
+import org.apache.commons.httpclient.params.HttpMethodParams;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.validator.routines.UrlValidator;
+import org.apache.commons.validator.routines.*;
+import org.apache.commons.httpclient.DefaultHttpMethodRetryHandler;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.URIException;
+import org.apache.commons.io.FileUtils;
+import java.net.MalformedURLException;
+import java.util.Arrays;
+import java.net.URL;
+import java.io.File;
+import java.io.InputStream;
+import java.io.FileOutputStream; 
+import java.nio.charset.Charset;
+import java.nio.ByteBuffer;
+import java.io.IOException;
+import java.nio.Buffer;
+import java.nio.channels.FileChannel;
+import java.io.IOException;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.CharBuffer;
+import java.io.File;
+import java.io.InputStream;
+import java.net.URISyntaxException;
 
 /**
    Description:
@@ -58,16 +94,72 @@ import static org.junit.Assert.assertEquals;
 */
 public class TestFetcher{
 
-    @Test 
-    public void testBuffer(){
-
-	assertEquals();
-    }
-
+    HttpClient client = new HttpClient();
+    GetMethod http = new GetMethod("http://rainbow.llnl.gov/dist/esgf-installer/HOWTO");
+    Fetcher fetcher = new Fetcher();
+    private int expectedResponseStatus;
+    private String expectedResponseBody;
+    
 
     @Test
-    public void testDirectory(){
-	assertEquals();
+    public void testGet() throws URIException,URISyntaxException{
+        URI uri = new URI("http://rainbow.llnl.gov/dist/esgf-installer/HOWTO", true);
+        assertEquals(uri, http.getURI());
     }
 
+    @Test
+    public void testURLValidatorWithSchemes(){
+      String[] schemes = {"http", "https"};
+      UrlValidator urlValidator = new UrlValidator(schemes, UrlValidator.ALLOW_2_SLASHES);
+      assertTrue(urlValidator.isValid("http://rainbow.llnl.gov/dist/esgf-installer/HOWTO"));
+    } 
+
+    @Test
+    public void testInvalidURLValidator(){
+      String[] schemes = {"http", "https", "ftp"};
+      UrlValidator urlValidator = new UrlValidator(schemes, UrlValidator.ALLOW_2_SLASHES);
+      assertFalse(urlValidator.isValid("http://hostname/test/index.html"));
+    }
+   
+   @Test 
+   public void testURLValidatorWithParenthesis(){
+      String[] schemes ={"http", "https", "ftp"};
+      UrlValidator urlValidator = new UrlValidator(schemes, UrlValidator.ALLOW_2_SLASHES);
+      assertTrue(urlValidator.isValid("http://somewhere.com/pathxyz/file(1).html"));
+   }
+
+
+   @Test 
+    public void testRetryMethod(){
+       int retry = 6;
+       DefaultHttpMethodRetryHandler retryHandler = new DefaultHttpMethodRetryHandler(retry, false);
+       assertEquals(retry, retryHandler.getRetryCount());
+    }
+
+    /* @Test
+    public void testDirectory(){
+     
+    }*/
+   
+    @Test
+    public void testGetResponse(){
+       GetMethod httpG = new GetMethod("/"); 
+       httpG.getParams().setParameter("http.socket.timeout", new Integer(5000));
+       httpG.releaseConnection();
+       assertEquals(5000, httpG.getParams().getParameter("http.socket.timeout"));
+
+         
+    }
+    @Test
+    public void testReadContent()throws IOException{
+        File file1 = fetcher.fetchURLContent("http://rainbow.llnl.gov/dist/esgf-installer/HOWTO", 4, new File("Result2.txt"));
+        File file2 = new File("HOWTO.txt");
+        assertTrue(FileUtils.contentEquals(file1, file2));
+         
+       } 
+
+    /* @Test 
+        public void testReadContentWithFile() throws IOException{
+
+        }*/
 }

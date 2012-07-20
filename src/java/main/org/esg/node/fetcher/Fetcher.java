@@ -53,136 +53,176 @@ import org.apache.commons.httpclient.*;
 import org.apache.commons.httpclient.methods.*;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.validator.routines.UrlValidatorimport;
+import org.apache.commons.validator.routines.UrlValidator;
+import org.apache.commons.validator.routines.*;
+import org.apache.commons.httpclient.DefaultHttpMethodRetryHandler;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 
-import java.net.*;
-import java.io.*; //FileInput(Output)Stream, InputStream,
-import java.nio.*;
-import java.nio.channels.spi;
-
+import java.io.OutputStream;
+import java.net.MalformedURLException;
+import java.util.Arrays;
+import java.net.URL;
+import java.io.File;
+import java.io.InputStream;
+import java.io.FileOutputStream; 
+import java.nio.charset.Charset;
+import java.nio.ByteBuffer;
+import java.io.IOException;
+import java.nio.Buffer;
+import java.nio.channels.FileChannel;
+import java.io.IOException;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.CharBuffer;
+import java.util.List;
 /**
    Description:
    This class pulls files from desginated targets to local host
 */
-public static class Fetcher {
+public class Fetcher {
 
-    private static File file;
-    private URL url;
+    private File file;
+    private String url;
     private HttpClient client;
-    int retry;
-    Path directory;
-    String fileName;
+    private int retry;
+    private InputStream in;
+    private static final String[] DEFAULT_SCHEMES = {"http", "https", "ftp"};
+    private URL aUrl;
+    private String fileName;
+    private GetMethod getHttp;
+    String[] arrayOfUrls;
+   
+     public Fetcher(){
+        client = null;
+        retry = 0;
+        url = null;
+        aUrl = null;
+        fileName = null;  
+        getHttp = null;
+        file = null;
+    }
 
-    public void fetchURLContent(String address, int retries) {
-	url = new URL(address);
-        isValid(); //check this method. it might be unecessary! 
-	
-	retry = retries;
-	HttpMethod getHttp = new GetMethod(url);
+    public Fetcher(String[] array, int numRetries){
+        arrayOfUrls = array;
+        for(String urls: arrayOfUrls){
+            fetchURLContent(urls, numRetries, fileInfo(urls));
+        }  
+        //FileUtils.toFile(arrayOfUrls);
+    }
+
+    /* Method gets an URL, gets its contents, and uses apache File Utils to process a stream, and copy it into a file. 
+       If the file doesn't exist, it would create it. If it already exists it would be overwritten.
+       It also checks that the URL is valid, and has a retry method that if the fetching fails it would retry x times according to what
+       the user specified. 
+    */
+    public File fetchURLContent(String address, int retries, File file){
+        url = address;
+	retry = retries;     
+        UrlValidator urlValidator = new UrlValidator(DEFAULT_SCHEMES, UrlValidator.ALLOW_2_SLASHES);
+	if(urlValidator.isValid(url)) {
+	    System.out.print("Success! Url was valid");
+	}else{ System.out.print("Url was invalid. Please try again."); }
+
+	client = new HttpClient();
+	getHttp = new GetMethod(url);
 	getHttp.setFollowRedirects(true);
-	HttpMethodRetryHandler retryHandler = new HttpMethodRetryHandler() { retryMethod(); }
+	DefaultHttpMethodRetryHandler retryHandler = new DefaultHttpMethodRetryHandler(retry, false); 
         getHttp.getParams().setParameter(HttpMethodParams.RETRY_HANDLER, retryHandler);
 	
 	try{
 	    int codeStatus =  client.executeMethod(getHttp);
-	    if(statusCode != HttpStatus.SC_OK){ System.err.println("Method failed: " + getHttp.getStatusLine().toString()); }
-	    else{System.out.prinln("Success");}
-	    /*InputStream in = getHttp.getResponseBodyAdStream();
-	      FileOutPutStream out = new FileOutputStream(setDirectory);
-	      int count = -1;
-	      while((count = in.read(buffer)) != -1){
-	      out.write(buffer, 0, count);
-	      }
-	      out.flush();
-	      out.close(); */
+	    if(codeStatus != HttpStatus.SC_OK){ System.out.println("Method failed: " + getHttp.getStatusLine()); }
+	    else{System.out.println("Success");}
+            InputStream in = getHttp.getResponseBodyAsStream();
+            copyInputStreamToFile(in, file);
+            // FileUtils.copyInputStreamToFile(in, file);
+            //readContent(in, url, file);
+            
+ 
 	}catch(HttpException e){
-	    System.err.println(e.getMessage);
+	    System.out.println(e.getMessage());
 	    e.printStackTrace();
-	}
-	//Read response body.Add buffer, and to check if there are more urls
-	//InputStream in =  getHttp.getResponseBodyAsStream(); //byte[]
-	//Buffer here!
-	byte[] responseBody = getUrl.getResponseBodyAsStream();
-	
-	try {
-	    SeekByteChannel sbc = Files.newByteChannel(responseBody);
-	    ByteByffer buffer = ByteBuffer.allocate(1024);	
-	    String encoding = System.getProperty("file.ecoding");
-	    
-	    while(sbc.read(buffer)) {
-		buffer.rewind();
-		System.out.print(Charset.forName(encoding).decode(buffer)); //gets name of the charset,Changes to Unicode
-		buffer.flip();
-	    }
-	}catch(ClosedChannelException e) {
-	    System.err.println(e.getMessage);
-	    e.printStackTrace();
-	}catch(AsynchronousCloseException e) {
-	    System.err.println(e.getMessage);
-	    e.printStackTrace();
-	}catch(ClosedByInterruptException e) {
-	    System.err.println(e.getMessage);
-	    e.printStackTrace();  
-	}catch(IOException io) {
-	    System.err.println(e.getMessage);
-	    e.printStackTrace();
-	}finally { getHttp.releaseConnection(); }
+	}catch(IOException e){
+            System.out.println(e.getMessage());
+            e.printStackTrace(); 
+        }finally { getHttp.releaseConnection(); }
+
+        return file;
+    }
+    
+    public void copyInputStreamToFile(InputStream source, File destination) throws IOException{
+        try{
+            FileOutputStream output = FileUtils.openOutputStream(destination);
+            try{
+                IOUtils.copyLarge(source,output);
+                output.close();
+            }finally{
+                IOUtils.closeQuietly(output);
+            } 
+        }finally{
+            IOUtils.closeQuietly(source);
+        }
+    }
+    public void readContent(InputStream in, String url, File file){
+        try{
+            this.in = in;
+            FileOutputStream out = new FileOutputStream(file);
+            byte[] buffer = new byte[1024];
+            int count = -1;
+            while((count = in.read(buffer)) != -1){
+            out.write(buffer, 0, count);
+            }
+            out.flush();
+            out.close();
+        }catch(IOException e){
+            e.printStackTrace();
+        }
     }
 
-    public boolean retryMethod(final HttpMethod method, final IOException, int retryCount) {
-	if(retryCount >= retry){ return false; }
-	if(exception instanceof NoHttpResponseException){ return true; }
-	if(!method.isRequestSent()){ return true;}
-	
-	return false;
-    }
 
-    public boolean setDirectory(String dir) {
-	filename = url.getFile();   
-	return file(url, new File(filename));
-	/*	File currentDir = System.getProperty("user.dir");
-		File dirc = new File(dir, filename);
-		if(!dirc.exists){dirc.createNewFile();)
-	*/
+    public File fileInfo(String url){
+        try{ aUrl = new URL(url);
+        }catch(MalformedURLException e){
+            System.err.println("Malformend exception: " + e.getMessage());
+        }
+        fileName = aUrl.getFile();
+        String workDir = System.getProperty("user.dir");
+        file = new File(workDir,fileName);
+        String userPath = file.getPath();
+        return file;
     }
-	
-    public String  getUrlInfo() {
-	Path path = url.getPath;
-	String fileN = url.getFile();
-	return System.out.println("FileName: " + fileN + "Path: " + path);
-    }
-
-    public boolean validateUrl() {
-	boolean isValid = false;
-	String[] schemes = {"http", "https"};
-	UrlValidator urlValidator = new UrlValidator(schemes);
-	
-	if(!UrlValidator.isValid(url)) {
-	    System.out.print("Url was invalid. Please try again");
-            isValid = false;
-	}else{
-	    isValid = true;
-	}
-	return isValid;
-    }
-
-    public static void main(String [ ] args) {
-	if(args.length != 3) {
-	    System.err.println("Please enter 3 arguments: url,retry number, and the directory to save");
+ 
+    public static void main(String[] args) throws Exception {
+	if(args.length !=3) {
+	    System.out.println("Please enter 3 arguments: url,retry number, and the directory to save");
 	    System.exit(1);
 	}
-	
-	String address = args[0];
-        try{ 
-	    int numRetries = Integer.parseInt(args[1]);
-	}catch (NumberFormatException e) {
-	    System.err.println("The third argument" + " must be an integer");
-	    System.exit(1);
-	}
+      
+      
+        File urlFile = new File(args[0]);
+	int numRetries = Integer.parseInt(args[1]);
 
-	directory = args[2];
-	client = new HttpClient();
-	fetchURLContent(address, numRetries);
-	setDirectory(args[2]);
+        if(urlFile.isFile()){
+            String encoding = System.getProperty("file.encoding");
+            List<String> list = FileUtils.readLines(urlFile, encoding);
+            String[] urlArray = list.toArray(new String[0]);
+            String directory = args[2];
+            Fetcher fetcher = new Fetcher(urlArray,numRetries);
+        }else{
+          Fetcher fetcher = new Fetcher();
+          File aFile = new File(args[2]);
+          String http = args[0];
+          fetcher.fetchURLContent(http, numRetries, aFile); 
+          fetcher.fileInfo(http);
+        }
+       
+
+       
     }
 }
