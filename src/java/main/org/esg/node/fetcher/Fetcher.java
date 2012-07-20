@@ -169,22 +169,6 @@ public class Fetcher {
             IOUtils.closeQuietly(source);
         }
     }
-    public void readContent(InputStream in, String url, File file){
-        try{
-            this.in = in;
-            FileOutputStream out = new FileOutputStream(file);
-            byte[] buffer = new byte[1024];
-            int count = -1;
-            while((count = in.read(buffer)) != -1){
-            out.write(buffer, 0, count);
-            }
-            out.flush();
-            out.close();
-        }catch(IOException e){
-            e.printStackTrace();
-        }
-    }
-
 
     public File fileInfo(String url){
         try{ aUrl = new URL(url);
